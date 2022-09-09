@@ -1,0 +1,133 @@
+#!/bin/bash
+
+if [ `whoami` == root ] ; then
+	echo "This script is not meant to be executed as root"
+	exit
+fi
+
+OPTION=$1
+MAJOR=$2
+MINOR=$3
+BMAN_DOWNLOAD_PATH="/home/maltose/byond-versions/" #~ does not work here for some reason
+BMAN_WINE_PREFIX="~/.local/share/wineprefixes/byondenv/"
+BMAN_BIN="/home/maltose/byond-versions/bin/" #~ does not work here either
+
+function help() {
+	echo "bman command line options:"
+	echo "	-h --help			Displays this message"
+	echo "	-g --get [MAJOR] [MINOR]	Downloads and configures the specified version of Byond"
+	echo "	-r --remove [MAJOR] [MINOR]	Deletes the specified version of Byond"
+	echo "	-s --set [MAJOR] [MINOR]	Sets the version of Byond which is used"
+	echo "	-l --list			Lists the installed versions of Byond"
+	exit
+}
+
+function get() {
+	cd $BMAN_DOWNLOAD_PATH
+	if [ -e $MAJOR-$MINOR ] ; then
+		echo "Byond version $MAJOR.$MINOR is already downloaded, please remove it first if you wish to download it again."
+		exit
+	fi
+#	read -p "Are you sure you want to download Byond version $MAJOR-$MINOR? [y/n] " INPUT
+#	if [[ ! $REPLY =~ [Yy]* ]] ; then
+#		exit
+#	fi
+	echo "Downloading http://www.byond.com/download/build/$MAJOR/$MAJOR.${MINOR}_byond.zip..."
+	wget http://www.byond.com/download/build/$MAJOR/$MAJOR.${MINOR}_byond.zip
+	if ! [ -e $MAJOR.${MINOR}_byond.zip ] ; then
+		echo "Failed to download Byond version $MAJOR-$MINOR"
+		exit
+	fi
+	echo "Unzipping Byond $MAJOR-$MINOR..."
+	mkdir $MAJOR-$MINOR
+	cd $MAJOR-$MINOR
+	unzip ../$MAJOR.${MINOR}_byond.zip
+	rm ../$MAJOR.${MINOR}_byond.zip
+	mv ./byond/bin/* .
+	echo "#!/bin/sh" > ./byond.sh
+	echo "WINEARCH=win32 WINEPREFIX=$BMAN_WINE_PREFIX wine $BMAN_DOWNLOAD_PATH/$MAJOR-$MINOR/byond.exe" >> ./byond.sh
+	chmod +x ./byond.sh
+	echo "#!/bin/sh" > ./dm.sh
+	echo "WINEARCH=win32 WINEPREFIX=$BMAN_WINE_PREFIX wine $BMAN_DOWNLOAD_PATH/$MAJOR-$MINOR/dm.exe" >> ./dm.sh
+	chmod +x ./dm.sh
+	echo "#!/bin/sh" > ./dm.sh
+	echo "WINEARCH=win32 WINEPREFIX=$BMAN_WINE_PREFIX wine $BMAN_DOWNLOAD_PATH/$MAJOR-$MINOR/DreamMaker.exe" >> ./DreamMaker.sh
+	chmod +x ./DreamMaker.sh
+	rm -r ./byond
+	exit
+}
+
+function remove() {
+	cd $BMAN_DOWNLOAD_PATH
+	if ! [ -e $MAJOR-$MINOR ] ; then
+		echo "You do not have Byond version $MAJOR-$MINOR installed."
+		exit
+	fi
+#	read -p "Are you sure you want to remove Byond version $MAJOR-$MINOR? [y/n] " INPUT
+#	if [[ ! $REPLY =~ [Yy]* ]] ; then
+#		exit
+#	fi
+	if [ -e $MAJOR-$MINOR ] ; then
+		rm -r $MAJOR-$MINOR
+	fi
+	if [ -e $MAJOR-$MINOR ] ; then
+		echo "For some reason the directory $MAJOR-$MINOR could not be removed, try manually removing it instead."
+	fi
+	exit
+}
+
+function set() {
+	cd $BMAN_DOWNLOAD_PATH
+	if ! [ -e $MAJOR-$MINOR ] ; then
+		echo "You do not have Byond version $MAJOR-$MINOR installed."
+		exit
+	fi
+#	read -p "Are you sure you want to switch to Byond version $MAJOR-$MINOR? [y/n] " INPUT
+#	if [[ ! $REPLY =~ [Yy]* ]] ; then
+#		exit
+#	fi
+	echo "Switching to Byond version $MAJOR-$MINOR..."
+	cd $BMAN_BIN
+	echo "#!/bin/sh" > ./dm
+	echo "$BMAN_DOWNLOAD_PATH/$MAJOR-$MINOR/dm.sh" >> ./dm
+	chmod +x ./dm
+	echo "#!/bin/sh" > ./byond
+	echo "$BMAN_DOWNLOAD_PATH/$MAJOR-$MINOR/byond.sh" >> ./byond
+	chmod +x ./byond
+	echo "#!/bin/sh" > ./DreamMaker
+	echo "$BMAN_DOWNLOAD_PATH/$MAJOR-$MINOR/DreamMaker.sh" >> ./DreamMaker
+	chmod +x ./DreamMaker
+	exit
+}
+
+function list() {
+	cd $BMAN_DOWNLOAD_PATH
+	echo "Downloaded Byond versions:"
+	for dir in ./*-*/ ; do
+		echo "	$dir"
+	done
+	exit
+}
+
+if ! [ -e $BMAN_DOWNLOAD_PATH ] ; then
+	read -p "$BMAN_DOWNLOAD_PATH (download path) does not exist, create it? [y/n] " INPUT
+	if [[ ! $REPLY =~ [Yy]* ]] ; then
+		exit
+        fi
+	mkdir $BMAN_DOWNLOAD_PATH
+	if ! [ -e $BMAN_DOWNLOAD_PATH ] ; then
+		echo "Could not create directory $BMAN_DOWNLOAD_PATH, aborting..."
+		exit
+	fi
+fi
+
+case $OPTION in
+	-h |    --help)	help	;;
+	-g |     --get)	get	;;
+	-r |  --remove)	remove	;;
+	-s |     --set)	set	;;
+	-l |    --list) list	;;
+esac
+
+echo "Invalid option. Use 'bman -h' for more info."
+exit
